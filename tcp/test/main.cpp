@@ -4,7 +4,7 @@
 #include <queue>
 #include <mutex>
 
-#define USE_TCP_SERVER_DEBUG_COUNTER
+//#define USE_TCP_SERVER_DEBUG_COUNTER
 
 using namespace common::tcp;
 using namespace common;
@@ -32,6 +32,7 @@ class server : public common::interface<server>
         {
           std::string str{data, len};
           m_strand.wrap([this, str]{
+            std::cout << str << std::endl;
             m_queue.push(str);
           });
         }
@@ -39,6 +40,7 @@ class server : public common::interface<server>
         {
           std::lock_guard<std::mutex> lk(m_mutex);
           std::string str{data, len};
+          std::cout << str << std::endl;
           m_queue.push(str);
         }
       });
@@ -65,10 +67,12 @@ int main(int argc, char **argv)
 
   tcp_server_params_t params;
   params.do_read_type = read_func_type_e::read_until_eol;
-  params.use_strand = false;
+  params.use_strand = true;
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
   params.read_counter = 999999;
+#endif
 
-  auto serv = server::create_server(9005, io_service, params);
+  auto serv = server::create_server(9000, io_service, params);
   //io_service.run();
   //return 0;
 
