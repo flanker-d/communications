@@ -4,6 +4,8 @@
 #include <queue>
 #include <mutex>
 
+#define USE_TCP_SERVER_DEBUG_COUNTER
+
 using namespace common::tcp;
 using namespace common;
 

@@ -6,7 +6,9 @@ namespace common
 {
   namespace tcp
   {
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
     using milli = std::chrono::milliseconds;
+#endif
 
     class client_session
      : public iclient_session
@@ -19,7 +21,9 @@ namespace common
         void shutdown() override;
       
       private:
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
         void increase_and_check_counter();
+#endif
 
         void do_receive_completion_eol();
         void do_receive_completion_std_find_eol();
@@ -36,9 +40,10 @@ namespace common
         tcp_server_params_t& m_params;
         boost::asio::streambuf m_streambuf;
         std::function<void()> m_do_receive_func;
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
         decltype(std::chrono::high_resolution_clock::now()) m_start_time;
         int m_counter = 0;
-
+#endif
     };
 
     client_session::client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, iserver::ref& a_server, tcp_server_params_t& a_params)
@@ -89,7 +94,9 @@ namespace common
 
     void client_session::start()
     {
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
       m_start_time = std::chrono::high_resolution_clock::now();
+#endif
       m_do_receive_func();
     }
 
@@ -99,6 +106,7 @@ namespace common
       m_sock.close();
     }
 
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
     void client_session::increase_and_check_counter()
     {
       m_counter++;
@@ -109,6 +117,7 @@ namespace common
         std::cout << std::chrono::duration_cast<milli>(finish_time - m_start_time).count() << std::endl;
       }
     }
+#endif
 
     void client_session::do_receive_completion_eol()
     {
@@ -141,7 +150,9 @@ namespace common
             if(auto serv = m_server.lock())
             {
               serv->on_message(m_client_id, m_buffer->data(), a_len);
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
               increase_and_check_counter();
+#endif
             }
 
             do_receive_completion_eol();
@@ -189,7 +200,9 @@ namespace common
           if(auto serv = m_server.lock())
           {
             serv->on_message(m_client_id, m_buffer->data(), a_len);
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
             increase_and_check_counter();
+#endif
           }
 
           do_receive_completion_std_find_eol();
@@ -229,7 +242,9 @@ namespace common
             std::string line;
             std::getline(is, line);
             serv->on_message(m_client_id, line.c_str(), line.size());
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
             increase_and_check_counter();
+#endif
           }
 
           do_receive_read_until_eol();
@@ -275,7 +290,9 @@ namespace common
                 std::string cmd(m_buffer_str.begin(), m_buffer_str.begin() + term_pos);
                 serv->on_message(m_client_id, cmd.c_str(), cmd.size());
                 m_buffer_str.erase(m_buffer_str.begin(), m_buffer_str.begin() + term_pos + 1);
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
                 increase_and_check_counter();
+#endif
               }
               else
               {

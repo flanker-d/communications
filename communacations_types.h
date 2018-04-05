@@ -18,7 +18,9 @@ namespace common
   {
     read_func_type_e do_read_type;
     bool use_strand;
-    int read_counter;
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+    int read_counter = -1;
+#endif
   };
 
 } //namespace common
