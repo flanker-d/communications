@@ -1,6 +1,10 @@
 #include "../../communications.h"
 #include <iostream>
 #include <chrono>
+#include <thread>
+#include <set>
+
+//#define USE_TCP_SERVER_DEBUG_COUNTER
 
 namespace common
 {
@@ -21,9 +25,7 @@ namespace common
         void shutdown() override;
       
       private:
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-        void increase_and_check_counter();
-#endif
+        void increase_msg_counter();
 
         void do_receive_completion_eol();
         void do_receive_completion_std_find_eol();
@@ -40,9 +42,11 @@ namespace common
         tcp_server_params_t& m_params;
         boost::asio::streambuf m_streambuf;
         std::function<void()> m_do_receive_func;
+        int m_msg_counter = 0;
+        std::set<decltype(std::this_thread::get_id())> m_threads;
+
 #ifdef USE_TCP_SERVER_DEBUG_COUNTER
         decltype(std::chrono::high_resolution_clock::now()) m_start_time;
-        int m_counter = 0;
 #endif
     };
 
@@ -77,6 +81,12 @@ namespace common
     client_session::~client_session()
     {
       //std::cout << "client session dtor called" << std::endl;
+#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+      auto finish_time = std::chrono::high_resolution_clock::now();
+      std::cout << std::chrono::duration_cast<milli>(finish_time - m_start_time).count()
+                << " ms. readed: " << m_msg_counter
+                << " msgs with " << m_threads.size() << " threads" << std::endl;
+#endif
     }
 
     void client_session::send_message(const std::string& a_data)
@@ -106,18 +116,15 @@ namespace common
       m_sock.close();
     }
 
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-    void client_session::increase_and_check_counter()
+    void client_session::increase_msg_counter()
     {
-      m_counter++;
+      m_msg_counter++;
 
-      if(m_counter == m_params.read_counter)
-      {
-        auto finish_time = std::chrono::high_resolution_clock::now();
-        std::cout << std::chrono::duration_cast<milli>(finish_time - m_start_time).count() << std::endl;
-      }
+      auto thread_id = std::this_thread::get_id();
+      auto found = m_threads.find(thread_id);
+      if(found == m_threads.end())
+        m_threads.emplace(thread_id);
     }
-#endif
 
     void client_session::do_receive_completion_eol()
     {
@@ -150,9 +157,7 @@ namespace common
             if(auto serv = m_server.lock())
             {
               serv->on_message(m_client_id, m_buffer->data(), a_len);
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-              increase_and_check_counter();
-#endif
+              increase_msg_counter();
             }
 
             do_receive_completion_eol();
@@ -200,9 +205,7 @@ namespace common
           if(auto serv = m_server.lock())
           {
             serv->on_message(m_client_id, m_buffer->data(), a_len);
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-            increase_and_check_counter();
-#endif
+            increase_msg_counter();
           }
 
           do_receive_completion_std_find_eol();
@@ -242,9 +245,7 @@ namespace common
             std::string line;
             std::getline(is, line);
             serv->on_message(m_client_id, line.c_str(), line.size());
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-            increase_and_check_counter();
-#endif
+            increase_msg_counter();
           }
 
           do_receive_read_until_eol();
@@ -290,9 +291,7 @@ namespace common
                 std::string cmd(m_buffer_str.begin(), m_buffer_str.begin() + term_pos);
                 serv->on_message(m_client_id, cmd.c_str(), cmd.size());
                 m_buffer_str.erase(m_buffer_str.begin(), m_buffer_str.begin() + term_pos + 1);
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
-                increase_and_check_counter();
-#endif
+                increase_msg_counter();
               }
               else
               {
