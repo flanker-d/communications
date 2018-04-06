@@ -18,13 +18,16 @@ namespace common
      : public iclient_session
     {
       public:
-        client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, iserver::ref& a_server, tcp_server_params_t& a_params);
+        client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref& a_server, tcp_server_params_t& a_params);
         ~client_session() override;
         void send_message(const std::string& a_data) override;
         void start() override;
         void shutdown() override;
-      
+
       private:
+        void remove_client();
+        void execute_on_message(const std::string &a_cmd, iserver::ref &a_serv);
+        void execute_on_message(const char *a_data, std::size_t a_len, iserver::ref &a_serv);
         void increase_msg_counter();
 
         void do_receive_completion_eol();
@@ -33,6 +36,7 @@ namespace common
 
       private:
         boost::asio::io_service::strand m_strand;
+        boost::asio::io_service::strand& m_sync_strand;
         boost::asio::ip::tcp::socket m_sock;
         iserver::weak_ref m_server;
         int m_client_id;
@@ -49,8 +53,9 @@ namespace common
 #endif
     };
 
-    client_session::client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, iserver::ref& a_server, tcp_server_params_t& a_params)
+    client_session::client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref& a_server, tcp_server_params_t& a_params)
      : m_strand(a_io_service)
+     , m_sync_strand(a_sync_strand)
      , m_sock(std::move(a_sock))
      , m_server(a_server)
      , m_client_id(m_sock.native_handle())
@@ -112,6 +117,46 @@ namespace common
       m_sock.close();
     }
 
+    void client_session::remove_client()
+    {
+      if(auto serv = m_server.lock())
+      {
+        if(m_params.use_strand)
+        {
+          m_sync_strand.post([this, serv]{
+            serv->remove_client(m_client_id);
+          });
+        }
+        else
+          serv->remove_client(m_client_id);
+      }
+    }
+
+    void client_session::execute_on_message(const std::string &a_cmd, iserver::ref &a_serv)
+    {
+      if(m_params.use_strand)
+      {
+        m_sync_strand.post([this, a_cmd, a_serv]{
+          a_serv->on_message(m_client_id, a_cmd.c_str(), a_cmd.size());
+        });
+      }
+      else
+        a_serv->on_message(m_client_id, a_cmd.c_str(), a_cmd.size());
+    }
+
+    void client_session::execute_on_message(const char *a_data, std::size_t a_len, iserver::ref &a_serv)
+    {
+      if(m_params.use_strand)
+      {
+        std::string cmd{a_data, a_len};
+        m_sync_strand.post([this, cmd, a_serv]{
+          a_serv->on_message(m_client_id, cmd.c_str(), cmd.size());
+        });
+      }
+      else
+        a_serv->on_message(m_client_id, a_data, a_len);
+    }
+
     void client_session::increase_msg_counter()
     {
       m_msg_counter++;
@@ -141,30 +186,21 @@ namespace common
         auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
         {
           if(a_len == 0)
-          {
-            if(auto serv = m_server.lock())
-            {
-              serv->remove_client(m_client_id);
-            }
-          }
+            remove_client();
 
           if (!a_ec)
           {
             if(auto serv = m_server.lock())
             {
-              serv->on_message(m_client_id, m_buffer->data(), a_len);
+              execute_on_message(m_buffer->data(), a_len - 1, serv);
+
               increase_msg_counter();
             }
 
             do_receive_completion_eol();
           }
           else
-          {
-            if(auto serv = m_server.lock())
-            {
-              serv->remove_client(m_client_id);
-            }
-          }
+            remove_client();
         };
 
         if(m_params.use_strand)
@@ -178,33 +214,25 @@ namespace common
       auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
       {
         if(a_len == 0)
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
+          remove_client();
 
         if (!a_ec)
         {
           if(auto serv = m_server.lock())
           {
             std::istream is(&m_streambuf);
-            std::string line;
-            std::getline(is, line);
-            serv->on_message(m_client_id, line.c_str(), line.size());
+            std::string cmd;
+            std::getline(is, cmd);
+
+            execute_on_message(cmd, serv);
+
             increase_msg_counter();
           }
 
           do_receive_read_until_eol();
         }
         else
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
+          remove_client();
       };
       if(m_params.use_strand)
         boost::asio::async_read_until(m_sock, m_streambuf, '\n', m_strand.wrap(async_read_handler));
@@ -218,12 +246,7 @@ namespace common
       auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
       {
         if(a_len == 0)
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
+          remove_client();
 
         if (!a_ec)
         {
@@ -237,7 +260,9 @@ namespace common
               if(term_pos != std::string::npos)
               {
                 std::string cmd(m_buffer_str.begin(), m_buffer_str.begin() + term_pos);
-                serv->on_message(m_client_id, cmd.c_str(), cmd.size());
+
+                execute_on_message(cmd, serv);
+
                 m_buffer_str.erase(m_buffer_str.begin(), m_buffer_str.begin() + term_pos + 1);
                 increase_msg_counter();
               }
@@ -251,12 +276,7 @@ namespace common
           do_receive_async_read_some_eol();
         }
         else
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
+          remove_client();
       };
 
       if(m_params.use_strand)
@@ -271,9 +291,9 @@ namespace common
 {
   namespace tcp
   {
-    iclient_session::ref create_client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, iserver::ref a_server, tcp_server_params_t& a_params)
+    iclient_session::ref create_client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref a_server, tcp_server_params_t& a_params)
     {
-      return std::make_shared<client_session>(a_sock, a_io_service, a_server, a_params);
+      return std::make_shared<client_session>(a_sock, a_io_service, a_sync_strand, a_server, a_params);
     }
   } //namespace tcp
 } //namespace common

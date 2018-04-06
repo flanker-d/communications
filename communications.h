@@ -41,7 +41,7 @@ namespace common
         virtual void shutdown() = 0;
     };
 
-    iclient_session::ref create_client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, iserver::ref a_server, tcp_server_params_t& a_params);
+    iclient_session::ref create_client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref a_server, tcp_server_params_t& a_params);
 
   } //namespace tcp
 } //namespace common
