@@ -9,9 +9,8 @@ namespace common
   enum class read_func_type_e
   {
       custom_eol,
-      custom_eol_std_find,
       read_until_eol,
-      async_read
+      async_read_some_eol
   };
 
   struct tcp_server_params_t

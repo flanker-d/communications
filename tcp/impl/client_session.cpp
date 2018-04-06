@@ -4,13 +4,13 @@
 #include <thread>
 #include <set>
 
-//#define USE_TCP_SERVER_DEBUG_COUNTER
+//#define DEBUG_METRICKS
 
 namespace common
 {
   namespace tcp
   {
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+#ifdef DEBUG_METRICKS
     using milli = std::chrono::milliseconds;
 #endif
 
@@ -28,9 +28,8 @@ namespace common
         void increase_msg_counter();
 
         void do_receive_completion_eol();
-        void do_receive_completion_std_find_eol();
         void do_receive_read_until_eol();
-        void do_receive_async_read();
+        void do_receive_async_read_some_eol();
 
       private:
         boost::asio::io_service::strand m_strand;
@@ -45,7 +44,7 @@ namespace common
         int m_msg_counter = 0;
         std::set<decltype(std::this_thread::get_id())> m_threads;
 
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+#ifdef DEBUG_METRICKS
         decltype(std::chrono::high_resolution_clock::now()) m_start_time;
 #endif
     };
@@ -63,17 +62,14 @@ namespace common
         case read_func_type_e::custom_eol:
           m_do_receive_func = std::bind(&client_session::do_receive_completion_eol, this);
           break;
-        case read_func_type_e::custom_eol_std_find:
-          m_do_receive_func = std::bind(&client_session::do_receive_completion_std_find_eol, this);
-          break;
         case read_func_type_e::read_until_eol:
           m_do_receive_func = std::bind(&client_session::do_receive_read_until_eol, this);
           break;
-        case read_func_type_e::async_read:
-          m_do_receive_func = std::bind(&client_session::do_receive_async_read, this);
+        case read_func_type_e::async_read_some_eol:
+          m_do_receive_func = std::bind(&client_session::do_receive_async_read_some_eol, this);
           break;
         default:
-          m_do_receive_func = std::bind(&client_session::do_receive_read_until_eol, this);
+          m_do_receive_func = std::bind(&client_session::do_receive_async_read_some_eol, this);
           break;
       }
     }
@@ -81,7 +77,7 @@ namespace common
     client_session::~client_session()
     {
       //std::cout << "client session dtor called" << std::endl;
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+#ifdef DEBUG_METRICKS
       auto finish_time = std::chrono::high_resolution_clock::now();
       std::cout << std::chrono::duration_cast<milli>(finish_time - m_start_time).count()
                 << " ms. readed: " << m_msg_counter
@@ -104,7 +100,7 @@ namespace common
 
     void client_session::start()
     {
-#ifdef USE_TCP_SERVER_DEBUG_COUNTER
+#ifdef DEBUG_METRICKS
       m_start_time = std::chrono::high_resolution_clock::now();
 #endif
       m_do_receive_func();
@@ -177,54 +173,6 @@ namespace common
           boost::asio::async_read(m_sock, boost::asio::buffer(m_buffer->data(), BUF_LENGTH), async_read_completion_handler, async_read_handler);
     }
 
-    void client_session::do_receive_completion_std_find_eol()
-    {
-      m_buffer->fill(0);
-
-      auto async_read_completion_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)->std::size_t
-      {
-        if ( a_ec)
-          return 0;
-        bool found = std::find(m_buffer->data(), m_buffer->data() + a_len, '\n') < m_buffer->data() + a_len;
-        // we read one-by-one until we get to enter, no buffering
-        return found ? 0 : 1;
-      };
-
-      auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
-      {
-        if(a_len == 0)
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
-
-        if (!a_ec)
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->on_message(m_client_id, m_buffer->data(), a_len);
-            increase_msg_counter();
-          }
-
-          do_receive_completion_std_find_eol();
-        }
-        else
-        {
-          if(auto serv = m_server.lock())
-          {
-            serv->remove_client(m_client_id);
-          }
-        }
-      };
-
-      if(m_params.use_strand)
-        boost::asio::async_read(m_sock, boost::asio::buffer(m_buffer->data(), BUF_LENGTH), async_read_completion_handler, m_strand.wrap(async_read_handler));
-      else
-        boost::asio::async_read(m_sock, boost::asio::buffer(m_buffer->data(), BUF_LENGTH), async_read_completion_handler, async_read_handler);
-    }
-
     void client_session::do_receive_read_until_eol()
     {
       auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
@@ -264,7 +212,7 @@ namespace common
         boost::asio::async_read_until(m_sock, m_streambuf, '\n', async_read_handler);
     }
 
-    void client_session::do_receive_async_read()
+    void client_session::do_receive_async_read_some_eol()
     {
       m_buffer->fill(0);
       auto async_read_handler = [this](const boost::system::error_code& a_ec, std::size_t a_len)
@@ -295,14 +243,12 @@ namespace common
               }
               else
               {
-                m_buffer->fill(0);
-                return;
+                break;
               }
             }
-            m_buffer->fill(0);
           }
 
-          do_receive_async_read();
+          do_receive_async_read_some_eol();
         }
         else
         {
@@ -314,9 +260,9 @@ namespace common
       };
 
       if(m_params.use_strand)
-        boost::asio::async_read(m_sock, boost::asio::buffer(m_buffer->data(), BUF_LENGTH), m_strand.wrap(async_read_handler));
+        m_sock.async_read_some(boost::asio::buffer(m_buffer->data(), BUF_LENGTH), m_strand.wrap(async_read_handler));
       else
-        boost::asio::async_read(m_sock, boost::asio::buffer(m_buffer->data(), BUF_LENGTH), async_read_handler);
+        m_sock.async_read_some(boost::asio::buffer(m_buffer->data(), BUF_LENGTH), async_read_handler);
     }
   } //namespace tcp
 } //namespace common
