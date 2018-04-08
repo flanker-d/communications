@@ -46,7 +46,7 @@ namespace common
         boost::asio::streambuf m_streambuf;
         std::function<void()> m_do_receive_func;
         int m_msg_counter = 0;
-        std::set<decltype(std::this_thread::get_id())> m_threads;
+        std::set<decltype(std::this_thread::get_id())> m_thread_id_set;
 
 #ifdef DEBUG_METRICKS
         decltype(std::chrono::high_resolution_clock::now()) m_start_time;
@@ -64,7 +64,7 @@ namespace common
     {
       switch (m_params.do_read_type)
       {
-        case read_func_type_e::custom_eol:
+        case read_func_type_e::completion_eol:
           m_do_receive_func = std::bind(&client_session::do_receive_completion_eol, this);
           break;
         case read_func_type_e::read_until_eol:
@@ -86,7 +86,7 @@ namespace common
       auto finish_time = std::chrono::high_resolution_clock::now();
       std::cout << std::chrono::duration_cast<milli>(finish_time - m_start_time).count()
                 << " ms. readed: " << m_msg_counter
-                << " msgs with " << m_threads.size() << " threads" << std::endl;
+                << " msgs with " << m_thread_id_set.size() << " threads" << std::endl;
 #endif
     }
 
@@ -162,9 +162,9 @@ namespace common
       m_msg_counter++;
 
       auto thread_id = std::this_thread::get_id();
-      auto found = m_threads.find(thread_id);
-      if(found == m_threads.end())
-        m_threads.emplace(thread_id);
+      auto found = m_thread_id_set.find(thread_id);
+      if(found == m_thread_id_set.end())
+        m_thread_id_set.emplace(thread_id);
     }
 
     void client_session::do_receive_completion_eol()

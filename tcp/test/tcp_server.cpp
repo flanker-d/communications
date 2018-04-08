@@ -10,8 +10,8 @@ using namespace common;
 class server : public common::interface<server>
 {
   public:
-    server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params)
-      : m_server(common::tcp::create_server(a_port, a_io_service, a_params))
+    server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service)
+      : m_server(common::tcp::create_server(a_params, a_io_service))
       , m_io_service(a_io_service)
       , m_strand(m_io_service)
       , m_params(a_params)
@@ -45,9 +45,9 @@ class server : public common::interface<server>
 
       m_server->run();
     }
-    static server::ref create_server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params)
+    static server::ref create_server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service)
     {
-      return std::make_shared<server>(a_port, a_io_service, a_params);
+      return std::make_shared<server>(a_params, a_io_service);
     }
 
   private:
@@ -64,10 +64,11 @@ int main(int argc, char **argv)
   boost::asio::io_service io_service;
 
   tcp_server_params_t params;
+  params.port = 9000;
   params.do_read_type = read_func_type_e::read_until_eol;
   params.use_strand = true;
 
-  auto serv = server::create_server(9000, io_service, params);
+  auto serv = server::create_server(params, io_service);
   //io_service.run();
   //return 0;
 

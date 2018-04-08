@@ -11,7 +11,7 @@ namespace common
      , public std::enable_shared_from_this<iserver>
     {
       public:
-        server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params);
+        server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service);
         void run() override;
         void remove_client(const int a_client_id) override;
         void set_on_connected(std::function<void(const int)> a_on_connected) override;
@@ -39,11 +39,11 @@ namespace common
         std::function<void(const int, const char *, std::size_t)> m_on_message_func;
     };
 
-    server::server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params)
+    server::server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service)
      : m_io_service(a_io_service)
      , m_strand(a_io_service)
      , m_listener(a_io_service)
-     , m_acceptor(a_io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), a_port))
+     , m_acceptor(a_io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4::from_string(a_params.ip), a_params.port))
      , m_params(a_params)
     {
     }
@@ -133,9 +133,9 @@ namespace common
 {
   namespace tcp
   {
-    iserver::ref create_server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params)
+    iserver::ref create_server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service)
     {
-      return std::make_shared<server>(a_port, a_io_service, a_params);
+      return std::make_shared<server>(a_params, a_io_service);
     }
   } //namespace tcp
 } //namespace common

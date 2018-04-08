@@ -12,11 +12,12 @@ add_library(communications_tcp
         ../interface/interface.h
         tcp/impl/client_session.cpp
         tcp/impl/server.cpp
+        tcp/impl/client.cpp
         )
 target_link_libraries(communications_tcp -lboost_system)
 
 add_executable(communications_tcp_test_app
-        tcp/test/main.cpp
+        tcp/test/tcp_server.cpp
         )
 target_link_libraries(communications_tcp_test_app
         communications_tcp

@@ -30,7 +30,7 @@ namespace common
         virtual void do_accept() = 0;
     };
 
-    iserver::ref create_server(const int a_port, boost::asio::io_service& a_io_service, tcp_server_params_t& a_params);
+    iserver::ref create_server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service);
 
     class iclient_session
       : public interface<iclient_session>
@@ -42,6 +42,22 @@ namespace common
     };
 
     iclient_session::ref create_client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref a_server, tcp_server_params_t& a_params);
+
+    class iclient
+      : public interface<iclient>
+    {
+      public:
+        virtual void run() = 0;
+        virtual void send_message(const std::string& a_data) = 0;
+        virtual void set_on_connected(std::function<void()> a_on_connected) = 0;
+        virtual void set_on_disconnected(std::function<void()> a_on_disconnected) = 0;
+        virtual void set_on_message(std::function<void(const std::string&)> a_on_message) = 0;
+
+      protected:
+        virtual void do_connect() = 0;
+    };
+
+    iclient::ref create_client(tcp_client_params_t& a_params, boost::asio::io_service& a_io_service);
 
   } //namespace tcp
 } //namespace common
