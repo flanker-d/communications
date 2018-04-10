@@ -60,4 +60,23 @@ namespace common
     iclient::ref create_client(tcp_client_params_t& a_params, boost::asio::io_service& a_io_service);
 
   } //namespace tcp
+
+  namespace udp
+  {
+    namespace multicast
+    {
+      class iclient
+        : public interface<iclient>
+      {
+        public:
+          virtual void run() = 0;
+          virtual void set_on_data(std::function<void(const char *a_data, std::size_t a_len)> a_on_data) = 0;
+
+        protected:
+          virtual void do_receive() = 0;
+      };
+
+      iclient::ref create_client(udp_multicast_params_t& a_params, boost::asio::io_service& a_io_service);
+    } //namespace multicast
+  } //namespace udp
 } //namespace common

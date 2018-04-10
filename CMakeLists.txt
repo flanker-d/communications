@@ -13,6 +13,7 @@ add_library(communications_tcp
         tcp/impl/client_session.cpp
         tcp/impl/server.cpp
         tcp/impl/client.cpp
+        udp/multicast/impl/client.cpp
         )
 target_link_libraries(communications_tcp -lboost_system)
 
@@ -24,7 +25,25 @@ target_link_libraries(communications_tcp_test_app
         -lpthread
         )
 
-set_target_properties(communications_tcp communications_tcp_test_app PROPERTIES
+add_library(communications_udp_multicast
+        udp/multicast/impl/client.cpp
+        )
+target_link_libraries(communications_udp_multicast -lboost_system)
+
+add_executable(communications_udp_multicast_test_app
+        udp/multicast/test/multicast_client.cpp
+        )
+target_link_libraries(communications_udp_multicast_test_app
+        communications_udp_multicast
+        -lpthread
+        )
+
+set_target_properties(communications_tcp
+        communications_tcp_test_app
+        communications_udp_multicast
+        communications_udp_multicast_test_app
+
+        PROPERTIES
         CXX_STANDARD 14
         CXX_STANDARD_REQUIRED ON
         COMPILE_OPTIONS -Wpedantic -Wall -Wextra

@@ -18,7 +18,7 @@ namespace common
     std::string ip = "0.0.0.0";
     std::uint16_t port;
     read_func_type_e do_read_type;
-    bool use_strand;
+    bool use_strand = false;
   };
 
   struct tcp_client_params_t
@@ -27,6 +27,15 @@ namespace common
     std::uint16_t port;
     read_func_type_e do_read_type;
     bool use_strand;
+  };
+
+  struct udp_multicast_params_t
+  {
+    std::string source_ip;
+    std::string group_ip;
+    std::uint16_t port;
+    std::string interface_name;
+    bool use_strand = false;
   };
 
 } //namespace common
