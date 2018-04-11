@@ -61,7 +61,7 @@ namespace common
       if(found_it != m_clients.end())
       {
         //std::cout << "client removed" << std::endl;
-        found_it->second->shutdown();
+        //found_it->second->shutdown();
         m_clients.erase(found_it);
         on_disconnected(a_client_id);
       }
