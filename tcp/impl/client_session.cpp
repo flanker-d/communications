@@ -21,6 +21,7 @@ namespace common
         client_session(boost::asio::ip::tcp::socket& a_sock, boost::asio::io_service& a_io_service, boost::asio::io_service::strand& a_sync_strand, iserver::ref& a_server, tcp_server_params_t& a_params);
         ~client_session() override;
         void send_message(const std::string& a_data) override;
+        void send_data(const char *a_data, std::size_t a_len) override;
         void start() override;
         void shutdown() override;
 
@@ -100,6 +101,19 @@ namespace common
         boost::asio::async_write(m_sock, boost::asio::buffer(a_data.c_str(), a_data.length()), m_strand.wrap(async_write_handler));
       else
         boost::asio::async_write(m_sock, boost::asio::buffer(a_data.c_str(), a_data.length()), async_write_handler);
+
+    }
+
+    void client_session::send_data(const char *a_data, std::size_t a_len)
+    {
+      auto async_write_handler = [this](boost::system::error_code /*ec*/, std::size_t /*length*/)
+      {
+        //std::cout << to_send_str;
+      };
+      if(m_params.use_strand)
+        boost::asio::async_write(m_sock, boost::asio::buffer(a_data, a_len), m_strand.wrap(async_write_handler));
+      else
+        boost::asio::async_write(m_sock, boost::asio::buffer(a_data, a_len), async_write_handler);
 
     }
 

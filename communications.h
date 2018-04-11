@@ -24,6 +24,8 @@ namespace common
         virtual void on_disconnected(const int a_client_id) = 0;
         virtual void on_message(const int a_client_id, const char *a_data, std::size_t a_len) = 0;
         virtual void send_message(const int a_client_id, const std::string& a_message) = 0;
+        virtual void send_data(const int a_client_id, const char *a_data, std::size_t a_len) = 0;
+        virtual void send_data_for_all(const char *a_data, std::size_t a_len) = 0;
         virtual std::size_t clients_count() = 0;
 
       protected:
@@ -37,6 +39,7 @@ namespace common
     {
       public:
         virtual void send_message(const std::string& a_data) = 0;
+        virtual void send_data(const char *a_data, std::size_t a_len) = 0;
         virtual void start() = 0;
         virtual void shutdown() = 0;
     };

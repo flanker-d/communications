@@ -21,6 +21,8 @@ namespace common
         void on_disconnected(const int a_client_id) override;
         void on_message(const int a_client_id, const char *a_data, std::size_t a_len) override;
         void send_message(const int a_client_id, const std::string &a_message) override;
+        void send_data(const int a_client_id, const char *a_data, std::size_t a_len) override;
+        void send_data_for_all(const char *a_data, std::size_t a_len) override;
         std::size_t clients_count() override;
 
       private:
@@ -103,6 +105,19 @@ namespace common
       const auto& found_it = m_clients.find(a_client_id);
       if(found_it != m_clients.end())
         found_it->second->send_message(a_message);
+    }
+
+    void server::send_data(const int a_client_id, const char *a_data, std::size_t a_len)
+    {
+      const auto& found_it = m_clients.find(a_client_id);
+      if(found_it != m_clients.end())
+        found_it->second->send_data(a_data, a_len);
+    }
+
+    void server::send_data_for_all(const char *a_data, std::size_t a_len)
+    {
+      for(auto& cl : m_clients)
+        cl.second->send_data(a_data, a_len);
     }
 
     std::size_t server::clients_count()
