@@ -73,6 +73,7 @@ namespace common
       {
         public:
           virtual void run() = 0;
+          virtual void stop() = 0;
           virtual void set_on_data(std::function<void(const char *a_data, std::size_t a_len)> a_on_data) = 0;
 
         protected:

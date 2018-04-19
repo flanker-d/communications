@@ -94,6 +94,7 @@ namespace common
         public:
           client(udp_multicast_params_t& a_params, boost::asio::io_service& a_io_service);
           void run() override;
+          void stop() override;
           void set_on_data(std::function<void(const char *a_data, std::size_t a_len)> a_on_data) override;
 
         protected:
@@ -106,6 +107,7 @@ namespace common
           boost::asio::ip::udp::endpoint m_ep;
           std::unique_ptr<buf_array_t> m_buffer = std::make_unique<buf_array_t>();
           std::function<void(const char *a_data, std::size_t a_len)> m_on_data_func;
+          bool m_is_run{true};
       };
 
       client::client(udp_multicast_params_t& a_params, boost::asio::io_service& a_io_service)
@@ -127,6 +129,11 @@ namespace common
         do_receive();
       }
 
+      void client::stop()
+      {
+        m_is_run = false;
+      }
+
       void client::set_on_data(std::function<void(const char *a_data, std::size_t a_len)> a_on_data)
       {
         m_on_data_func = a_on_data;
@@ -138,6 +145,9 @@ namespace common
 
         auto read_handler = [this](boost::system::error_code ec, std::size_t bytes_recvd)
         {
+          if(!m_is_run)
+            return;
+
           if(!ec && bytes_recvd > 0)
           {
             if(m_on_data_func != nullptr)
