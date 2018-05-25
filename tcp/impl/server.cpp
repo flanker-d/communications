@@ -30,9 +30,9 @@ namespace common
 
       private:
         boost::asio::io_service& m_io_service;
-        boost::asio::io_service::strand m_strand;
-        boost::asio::ip::tcp::socket m_listener;
-        boost::asio::ip::tcp::acceptor m_acceptor;
+        std::shared_ptr<boost::asio::io_service::strand> m_strand;
+        std::shared_ptr<boost::asio::ip::tcp::socket> m_listener;
+        std::shared_ptr<boost::asio::ip::tcp::acceptor> m_acceptor;
         std::unordered_map<int, iclient_session::ref> m_clients;
         tcp_server_params_t& m_params;
 
@@ -43,9 +43,9 @@ namespace common
 
     server::server(tcp_server_params_t& a_params, boost::asio::io_service& a_io_service)
      : m_io_service(a_io_service)
-     , m_strand(a_io_service)
-     , m_listener(a_io_service)
-     , m_acceptor(a_io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4::from_string(a_params.ip), a_params.port))
+     , m_strand(std::make_shared<boost::asio::io_service::strand>(a_io_service))
+     , m_listener(std::make_shared<boost::asio::ip::tcp::socket>(a_io_service))
+     , m_acceptor(std::make_shared<boost::asio::ip::tcp::acceptor>(a_io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4::from_string(a_params.ip), a_params.port)))
      , m_params(a_params)
     {
     }
@@ -127,12 +127,12 @@ namespace common
 
     void server::do_accept()
     {
-      m_acceptor.async_accept(m_listener, [this](boost::system::error_code a_ec)
+      m_acceptor->async_accept(*m_listener, [this](boost::system::error_code a_ec)
       {
         if(!a_ec)
         {
-          int client_id = m_listener.native_handle();
-          auto new_client = common::tcp::create_client_session(m_listener, m_io_service, m_strand, shared_from_this(), m_params);
+          int client_id = m_listener->native_handle();
+          auto new_client = common::tcp::create_client_session(*m_listener, m_io_service, *m_strand, shared_from_this(), m_params);
           m_clients.insert(std::make_pair(client_id, new_client));
           new_client->start();
           on_connected(client_id);
