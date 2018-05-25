@@ -31,7 +31,7 @@ namespace common
         std::shared_ptr<boost::asio::ip::tcp::socket> m_sock;
         bool m_is_connected;
         pbuf_t m_buffer;
-        std::shared_ptr<boost::asio::streambuf> m_streambuf;
+        std::shared_ptr<boost::asio::streambuf> m_streambuf = std::make_shared<boost::asio::streambuf>();
         std::string m_buffer_str;
         std::shared_ptr<tcp_client_params_t> m_params;
 
